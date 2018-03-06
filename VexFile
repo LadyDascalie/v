@@ -1,5 +1,0 @@
-[vex]
-	[[vex.cmd]]
-	name = "build"
-	desc = "build and runs the project"
-	runs = "go build && ./v"

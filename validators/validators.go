@@ -2,6 +2,7 @@ package validators
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -21,9 +22,8 @@ var FuncMap = map[string]func(args string, value interface{}) error{
 
 // Required checks that the nullable type is in not nil
 func Required(args string, value interface{}) error {
-	// todo: this needs doing
-	if value == nil {
-		return fmt.Errorf("value of type [%T] is required", value)
+	if sanity.IsNullable(value) && reflect.ValueOf(value).IsNil() {
+		return fmt.Errorf("required, please provide a value")
 	}
 	return nil
 }
@@ -37,6 +37,14 @@ func In(args string, value interface{}) error {
 		nv := value.(string)
 		if !strIn(nv, accepted) {
 			return fmt.Errorf("accepted values are: [%s], but got: %s", strings.Join(accepted, ", "), nv)
+		}
+		return nil
+	case sanity.IsStringSlice(value):
+		nv := value.([]string)
+		for _, item := range nv {
+			if !strIn(item, accepted) {
+				return fmt.Errorf("accepted values are: [%s], but got: %s", strings.Join(accepted, ", "), nv)
+			}
 		}
 		return nil
 	case sanity.IsNumeric(value):
@@ -66,8 +74,16 @@ func Maxchar(args string, value interface{}) error {
 	switch v := value.(type) {
 	case string:
 		count := utf8.RuneCountInString(v)
-		if utf8.RuneCountInString(v) > max {
+		if count > max {
 			return fmt.Errorf("expected maximum %d characters, got: %d", max, count)
+		}
+	case []string:
+		var count int
+		for _, item := range v {
+			count = utf8.RuneCountInString(item)
+			if count > max {
+				return fmt.Errorf("items have an expected maximum %d characters, got: %d on value: %s", max, count, item)
+			}
 		}
 	default:
 		return fmt.Errorf("expected value of type string, but got %T", v)
@@ -159,7 +175,7 @@ func stringSliceToFloatSlice(values []string) (floats []float64, err error) {
 }
 
 // f64 formats a float value for human reading.
-// ex: 100.00 -> 100 or 100.123000 -> 100.123
+// ex: 100.0 -> 100 or 100.123000 -> 100.123
 func f64(f float64) string {
 	return strconv.FormatFloat(f, 'f', -1, 64)
 }
