@@ -23,7 +23,6 @@ func makeTestableStruct() Tester {
 			f32Between3: 123.123, // should not trigger validation at all
 		},
 		RequiredSliceOfString: &[]string{"a", "b", "hello world"},
-		//RequiredSliceOfString:        nil,
 	}
 	return tester
 }
