@@ -1,0 +1,61 @@
+# What needs implementing currently:
+
+## Without parameters
+- [ ] `email`
+- [ ] `url`
+- [ ] `dialstring`
+- [ ] `requrl`
+- [ ] `requri`
+- [ ] `alpha`
+- [ ] `utfletter`
+- [ ] `alphanum`
+- [ ] `utfletternum`
+- [ ] `numeric`
+- [ ] `utfnumeric`
+- [ ] `utfdigit`
+- [ ] `hexadecimal`
+- [ ] `hexcolor`
+- [ ] `rgbcolor`
+- [ ] `lowercase`
+- [ ] `uppercase`
+- [x] `int`
+- [x] `float`
+- [ ] `null`
+- [ ] `uuid`
+- [ ] `uuidv3`
+- [ ] `uuidv4`
+- [ ] `uuidv5`
+- [ ] `creditcard`
+- [ ] `isbn10`
+- [ ] `isbn13`
+- [ ] `json`
+- [ ] `multibyte`
+- [ ] `ascii`
+- [ ] `printableascii`
+- [ ] `fullwidth`
+- [ ] `halfwidth`
+- [ ] `variablewidth`
+- [ ] `base64`
+- [ ] `datauri`
+- [ ] `ip`
+- [ ] `port`
+- [ ] `ipv4`
+- [ ] `ipv6`
+- [ ] `dns`
+- [ ] `host`
+- [ ] `mac`
+- [ ] `latitude`
+- [ ] `longitude`
+- [ ] `ssn`
+- [ ] `semver`
+- [ ] `rfc3339`
+- [ ] `rfc3339WithoutZone`
+- [ ] `ISO3166Alpha2`
+- [ ] `ISO3166Alpha3`
+
+## With parameters
+- [x] `range:min..max)`
+- [x] `length:min..max`
+- [x] `runelength:min..max`
+- [ ] `matches:pattern`
+- [x] `in:string1,string2,...`
