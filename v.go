@@ -19,6 +19,7 @@ const (
 	between  = "between"
 	maxchar  = "maxchar"
 	in       = "in"
+	function = "func"
 )
 
 func Struct(structure interface{}) error {
@@ -115,6 +116,12 @@ func validate(tag string, value interface{}) error {
 		return validators.In(vtag.Args, value)
 	case required:
 		return validators.Required(vtag.Args, value)
+	case function:
+		fn, ok := validators.CustomFuncMap.Get(vtag.Args)
+		if ok {
+			return fn(vtag.Args, value)
+		}
+		return fmt.Errorf("custom validator %s did not match", vtag.Args)
 	default:
 		log.Printf("could not parse validation tag: %s", vtag.Name)
 	}

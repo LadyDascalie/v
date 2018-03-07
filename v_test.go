@@ -1,9 +1,31 @@
 package v
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"testing"
+
+	"github.com/ladydascalie/v/validators"
 )
+
+func init() {
+	validators.CustomFuncMap.Set("myval", func(args string, value interface{}) error {
+		slice, ok := value.([]string)
+		if !ok {
+			errors.New("cannot handle non slice")
+		}
+		for _, item := range slice {
+			switch item {
+			case "a", "b", "c":
+				return nil
+			default:
+				return fmt.Errorf("item %s did not match any of the expected values", item)
+			}
+		}
+		return nil
+	})
+}
 
 func makeTestableStruct() Tester {
 	str := "hello world"
@@ -23,6 +45,7 @@ func makeTestableStruct() Tester {
 			f32Between3: 123.123, // should not trigger validation at all
 		},
 		RequiredSliceOfString: &[]string{"a", "b", "hello world"},
+		CallOutsideFunc:       &[]string{"a", "b", "c", "d"}, // d is not wanted
 	}
 	return tester
 }
@@ -42,6 +65,7 @@ type Tester struct {
 	RequiredField *SubStruct `v:"required"`
 
 	RequiredSliceOfString *[]string `v:"required,maxchar:10,in:a|b|c"`
+	CallOutsideFunc       *[]string `v:"func:myval"`
 }
 
 type SubStruct struct {

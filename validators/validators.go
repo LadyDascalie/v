@@ -5,11 +5,36 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"github.com/ladydascalie/v/convert"
 	"github.com/ladydascalie/v/sanity"
 )
+
+// Validator is the type which covers all validators
+type Validator func(args string, value interface{}) error
+
+type customFuncMap struct {
+	rw         sync.RWMutex
+	validators map[string]Validator
+}
+
+func (c *customFuncMap) Set(tag string, validator Validator) {
+	c.rw.Lock()
+	c.validators[tag] = validator
+	c.rw.Unlock()
+}
+
+func (c *customFuncMap) Get(tag string) (validator Validator, ok bool) {
+	c.rw.Lock()
+	defer c.rw.Unlock()
+	validator, ok = c.validators[tag]
+	return
+}
+
+// CustomFuncMap should be used to access and add new validators
+var CustomFuncMap = &customFuncMap{validators: make(map[string]Validator)}
 
 // FuncMap defines where all the validator live.
 // This is also where you need to add any custom validator that you need.
