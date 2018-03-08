@@ -18,7 +18,7 @@ func init() {
 		for _, item := range slice {
 			switch item {
 			case "a", "b", "c":
-				return nil
+				// all good
 			default:
 				return fmt.Errorf("item %s did not match any of the expected values", item)
 			}
