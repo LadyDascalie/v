@@ -16,12 +16,10 @@ const (
 
 	// common tags
 	required = "required"
-	between  = "between"
-	maxchar  = "maxchar"
-	in       = "in"
-	function = "func"
 )
 
+// Struct takes in an interface, which must be a struct
+// all validation is ran based on the provided tags.
 func Struct(structure interface{}) error {
 	// nothing to see here
 	if structure == nil {
@@ -60,7 +58,7 @@ func Struct(structure interface{}) error {
 
 		// range over the tags
 		for _, vtag := range vtags {
-			if err := handleValidationTag(vtag, jtag, field, value); err != nil {
+			if err := handleValidationTag(vtag, jtag, field, value, structure); err != nil {
 				log.Println(err)
 			}
 		}
@@ -68,7 +66,7 @@ func Struct(structure interface{}) error {
 	return nil
 }
 
-func handleValidationTag(vtag, jtag string, field reflect.StructField, value reflect.Value) (err error) {
+func handleValidationTag(vtag, jtag string, field reflect.StructField, value reflect.Value, structure interface{}) (err error) {
 	// sanitize the tag. when multiple tags are used
 	// some leading/trailing spaces may be left
 	vtag = strings.TrimSpace(vtag)
@@ -91,7 +89,7 @@ func handleValidationTag(vtag, jtag string, field reflect.StructField, value ref
 	// Our field is valid, and we can interface without panic
 	// we are ready to send it to the validator methods
 	if value.IsValid() && value.CanInterface() {
-		if err = validate(vtag, value.Interface()); err != nil {
+		if err = validate(vtag, value.Interface(), structure); err != nil {
 			return ErrorValidation{
 				Name:     field.Name,
 				JSONName: jtag,
@@ -102,30 +100,33 @@ func handleValidationTag(vtag, jtag string, field reflect.StructField, value ref
 	return
 }
 
-func validate(tag string, value interface{}) error {
+func validate(tag string, value, structure interface{}) error {
 	vtag := newValidationTag(tag)
 	if vtag == nil {
 		return fmt.Errorf("v cannot parse struct tag <%v> please refer to the format rules", tag)
 	}
+
+	// run through the func map and see if there's a match
+	for name, method := range validators.FuncMap {
+		if vtag.Name == name {
+			return run(value, structure, vtag, method)
+		}
+	}
+	log.Printf("could not parse validation tag: %s", vtag.Name)
+	return nil
+}
+
+func run(value, structure interface{}, vtag *validationTag, method func(args string, value interface{}) error) error {
 	switch vtag.Name {
-	case maxchar:
-		return validators.Maxchar(vtag.Args, value)
-	case between:
-		return validators.Between(vtag.Args, value)
-	case in:
-		return validators.In(vtag.Args, value)
-	case required:
-		return validators.Required(vtag.Args, value)
-	case function:
+	case "func":
 		fn, ok := validators.CustomFuncMap.Get(vtag.Args)
 		if ok {
-			return fn(vtag.Args, value)
+			return fn(vtag.Args, value, structure)
 		}
 		return fmt.Errorf("custom validator %s did not match", vtag.Args)
 	default:
-		log.Printf("could not parse validation tag: %s", vtag.Name)
+		return method(vtag.Args, value)
 	}
-	return nil
 }
 
 type validationTag struct {

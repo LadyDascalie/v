@@ -10,10 +10,14 @@ import (
 
 	"github.com/ladydascalie/v/convert"
 	"github.com/ladydascalie/v/sanity"
+	"github.com/murlokswarm/errors"
 )
 
+// BuiltInValidator defines the signature for a built-in validator
+type BuiltInValidator func(args string, value interface{}) error
+
 // Validator is the type which covers all validators
-type Validator func(args string, value interface{}) error
+type Validator func(args string, value, structure interface{}) error
 
 type customFuncMap struct {
 	rw         sync.RWMutex
@@ -39,14 +43,18 @@ var CustomFuncMap = &customFuncMap{validators: make(map[string]Validator)}
 // FuncMap defines where all the validator live.
 // This is also where you need to add any custom validator that you need.
 var FuncMap = map[string]func(args string, value interface{}) error{
-	"maxchar":  Maxchar,
-	"in":       In,
-	"between":  Between,
-	"required": Required,
+	"required":      Required,
+	"maxchar":       Maxchar,
+	"in":            In,
+	"between":       Between,
+	"bytes_between": BytesBetween,
+	"empty_string":  EmptyString,
+	"is_int64":      IsInt64,
+	"is_float64":    IsFloat64,
 }
 
 // Required checks that the nullable type is in not nil
-func Required(args string, value interface{}) error {
+func Required(_ string, value interface{}) error {
 	if sanity.IsNullable(value) && reflect.ValueOf(value).IsNil() {
 		return fmt.Errorf("required, please provide a value")
 	}
@@ -116,10 +124,27 @@ func Maxchar(args string, value interface{}) error {
 	return nil
 }
 
+// BytesBetween checks if the provided string is constrained by the bounds, defined in bytes.
+func BytesBetween(args string, value interface{}) error {
+	str, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("expectd a string, but got %T", str)
+	}
+	min, max, err := bounds(args)
+	if err != nil {
+		return err
+	}
+	total := float64(len(str))
+	if total < min || total > max {
+		return fmt.Errorf("expected a value between %s and %s, but got %s", f64(min), f64(max), f64(total))
+	}
+	return nil
+}
+
 // Between checks if the provided value is constrained by the argument's bounds
 func Between(args string, value interface{}) error {
 	if _, ok := value.(string); ok {
-		return length(args, value)
+		return checkLength(args, value)
 	}
 	min, max, err := bounds(args)
 	if err != nil {
@@ -134,6 +159,46 @@ func Between(args string, value interface{}) error {
 		return fmt.Errorf("expected a value between %s and %s, but got %s", f64(min), f64(max), f64(nv))
 	}
 	return nil
+}
+
+// EmptyString check that the byte length of a string equals 0
+func EmptyString(_ string, value interface{}) error {
+	str, ok := value.(string)
+	if !ok {
+		errors.New("expected an empty string but got a %T", value)
+	}
+	if len(str) == 0 {
+		return nil
+	}
+	return fmt.Errorf("expected an empty string but got a string of byte length: %d", len(str))
+}
+
+// IsInt64 checks if a given string or byte slice can be converted to an int64
+func IsInt64(_ string, value interface{}) error {
+	switch value.(type) {
+	case string, []byte:
+		_, err := convert.ToInt64(value)
+		if err != nil {
+			return fmt.Errorf("expected a value that can be parsed into an int, but got a %T", value)
+		}
+		return nil
+	default:
+		return errors.New("this validator can only be used on strings or byte slices.")
+	}
+}
+
+// IsFloat64 checks if a given string or byte slice can be converted to a float64
+func IsFloat64(_ string, value interface{}) error {
+	switch value.(type) {
+	case string, []byte:
+		_, err := convert.ToFloat64(value)
+		if err != nil {
+			return fmt.Errorf("expected a value that can be parsed into a float, but got a %T", value)
+		}
+		return nil
+	default:
+		return errors.New("this validator can only be used on strings or byte slices.")
+	}
 }
 
 /*--------+
@@ -156,7 +221,7 @@ func bounds(s string) (min, max float64, err error) {
 	return
 }
 
-func length(args string, value interface{}) error {
+func checkLength(args string, value interface{}) error {
 	str := value.(string) // already checked by between
 	min, max, err := bounds(args)
 	if err != nil {

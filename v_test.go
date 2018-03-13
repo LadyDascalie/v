@@ -10,7 +10,13 @@ import (
 )
 
 func init() {
-	validators.CustomFuncMap.Set("myval", func(args string, value interface{}) error {
+	validators.CustomFuncMap.Set("custom_function", func(args string, value, structure interface{}) error {
+		tester, ok := structure.(*Tester)
+		if !ok {
+			return fmt.Errorf("expected type: %T, but got type: %T", &Tester{}, structure)
+		}
+		log.Printf("%#+v\n", tester)
+
 		slice, ok := value.([]string)
 		if !ok {
 			errors.New("cannot handle non slice")
@@ -65,7 +71,7 @@ type Tester struct {
 	RequiredField *SubStruct `v:"required"`
 
 	RequiredSliceOfString *[]string `v:"required,maxchar:10,in:a|b|c"`
-	CallOutsideFunc       *[]string `v:"func:myval"`
+	CallOutsideFunc       *[]string `v:"func:custom_function"`
 }
 
 type SubStruct struct {
@@ -76,5 +82,5 @@ type SubStruct struct {
 
 func TestStruct(t *testing.T) {
 	tester := makeTestableStruct()
-	log.Println(Struct(tester))
+	log.Println(Struct(&tester))
 }
