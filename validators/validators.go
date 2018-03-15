@@ -208,6 +208,8 @@ func IsFloat64(_ string, value interface{}) error {
 	}
 }
 
+// Matches checks against RegExp patterns to see if the
+// provided data matches the expected format.
 func Matches(args string, value interface{}) error {
 	switch v := value.(type) {
 	case string:
