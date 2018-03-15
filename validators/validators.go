@@ -1,6 +1,7 @@
 package validators
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -8,9 +9,9 @@ import (
 	"sync"
 	"unicode/utf8"
 
+	"engo.io/engo/math"
 	"github.com/ladydascalie/v/convert"
 	"github.com/ladydascalie/v/sanity"
-	"github.com/murlokswarm/errors"
 )
 
 // BuiltInValidator defines the signature for a built-in validator
@@ -22,6 +23,11 @@ type Validator func(args string, value, structure interface{}) error
 type customFuncMap struct {
 	rw         sync.RWMutex
 	validators map[string]Validator
+}
+
+// GetFuncMap returns the func map to v
+func GetFuncMap() *customFuncMap {
+	return CustomFuncMap
 }
 
 func (c *customFuncMap) Set(tag string, validator Validator) {
@@ -51,6 +57,7 @@ var FuncMap = map[string]func(args string, value interface{}) error{
 	"empty_string":  EmptyString,
 	"is_int64":      IsInt64,
 	"is_float64":    IsFloat64,
+	"matches":       Matches,
 }
 
 // Required checks that the nullable type is in not nil
@@ -61,7 +68,8 @@ func Required(_ string, value interface{}) error {
 	return nil
 }
 
-// In checks if the provided value is contained within the provided arguments
+// In checks if the provided value is contained within the provided arguments.
+// In works on strings, slices of strings (it will check each contained values), or numbers.
 func In(args string, value interface{}) error {
 	accepted := strings.Split(args, "|")
 
@@ -81,28 +89,27 @@ func In(args string, value interface{}) error {
 		}
 		return nil
 	case sanity.IsNumeric(value):
-		nv, err := convert.ToFloat64(value)
-		if err != nil {
-			return err
-		}
+		// I cannot think of any case where an error could occur
+		// if we're already certain we have a numeric type.
+		nv, _ := convert.ToFloat64(value)
 		values, err := stringSliceToFloatSlice(accepted)
 		if err != nil {
-			return err
+			return fmt.Errorf("in requires numeric parameters to check for numeric values: %v", err)
 		}
 		if !floatIn(nv, values) {
 			return fmt.Errorf("accepted values are: [%s], but got: %s", strings.Join(accepted, ", "), f64(nv))
 		}
 		return nil
+	default:
+		return fmt.Errorf("can only operate on string, []string, or numbers, got: %T", value)
 	}
-
-	return nil
 }
 
 // Maxchar checks if the value's length in characters is constrained by the argument's value
 func Maxchar(args string, value interface{}) error {
 	max, err := strconv.Atoi(args)
 	if err != nil {
-		return err
+		return fmt.Errorf("maxchar requires an integer as a parameter")
 	}
 	switch v := value.(type) {
 	case string:
@@ -128,7 +135,7 @@ func Maxchar(args string, value interface{}) error {
 func BytesBetween(args string, value interface{}) error {
 	str, ok := value.(string)
 	if !ok {
-		return fmt.Errorf("expectd a string, but got %T", str)
+		return fmt.Errorf("expected a string, but got %T", value)
 	}
 	min, max, err := bounds(args)
 	if err != nil {
@@ -165,7 +172,7 @@ func Between(args string, value interface{}) error {
 func EmptyString(_ string, value interface{}) error {
 	str, ok := value.(string)
 	if !ok {
-		errors.New("expected an empty string but got a %T", value)
+		return fmt.Errorf("expected an empty string but got a %T", value)
 	}
 	if len(str) == 0 {
 		return nil
@@ -183,7 +190,7 @@ func IsInt64(_ string, value interface{}) error {
 		}
 		return nil
 	default:
-		return errors.New("this validator can only be used on strings or byte slices.")
+		return errors.New("this validator can only be used on strings or byte slices")
 	}
 }
 
@@ -197,7 +204,43 @@ func IsFloat64(_ string, value interface{}) error {
 		}
 		return nil
 	default:
-		return errors.New("this validator can only be used on strings or byte slices.")
+		return errors.New("this validator can only be used on strings or byte slices")
+	}
+}
+
+func Matches(args string, value interface{}) error {
+	switch v := value.(type) {
+	case string:
+		exp, ok := regexMap[args]
+		if !ok {
+			return fmt.Errorf("no regex found for matcher: %s", args)
+		}
+		if !exp.MatchString(v) {
+			return fmt.Errorf("cannot validate data as %s", args)
+		}
+		return nil
+	case []byte:
+		exp, ok := regexMap[args]
+		if !ok {
+			return fmt.Errorf("no regex found for matcher: %s", args)
+		}
+		if !exp.Match(v) {
+			return fmt.Errorf("cannot validate data as %s", args)
+		}
+		return nil
+	case []string:
+		exp, ok := regexMap[args]
+		if !ok {
+			return fmt.Errorf("no regex found for matcher: %s", args)
+		}
+		for _, entry := range v {
+			if !exp.MatchString(entry) {
+				return fmt.Errorf("cannot validate data as %s", args)
+			}
+		}
+		return nil
+	default:
+		return errors.New("matches can only operate on strings, []byte, or []string")
 	}
 }
 
@@ -207,17 +250,31 @@ func IsFloat64(_ string, value interface{}) error {
 
 func bounds(s string) (min, max float64, err error) {
 	parts := strings.Split(s, "..")
-	if len(parts) != 2 {
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return min, max, fmt.Errorf("invalid range statement: %v", s)
 	}
-	min, err = strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return
+
+	// check for wildcards or convert
+	switch parts[0] {
+	case "*":
+		min = -math.MaxFloat64 + 1
+	default:
+		min, err = strconv.ParseFloat(parts[0], 64)
+		if err != nil {
+			return
+		}
 	}
-	max, err = strconv.ParseFloat(parts[1], 64)
-	if err != nil {
-		return
+
+	switch parts[1] {
+	case "*":
+		max = math.MaxFloat64
+	default:
+		max, err = strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return
+		}
 	}
+
 	return
 }
 
@@ -257,7 +314,7 @@ func stringSliceToFloatSlice(values []string) (floats []float64, err error) {
 	for _, v := range values {
 		f, err = strconv.ParseFloat(v, 64)
 		if err != nil {
-			return nil, fmt.Errorf("value %v cannot is not numeric", v)
+			return nil, fmt.Errorf("value %v is not numeric", v)
 		}
 		floats = append(floats, f)
 	}
@@ -267,5 +324,8 @@ func stringSliceToFloatSlice(values []string) (floats []float64, err error) {
 // f64 formats a float value for human reading.
 // ex: 100.0 -> 100 or 100.123000 -> 100.123
 func f64(f float64) string {
+	if f == math.MaxFloat64 || f == -math.MaxFloat64 {
+		return fmt.Sprint(f)
+	}
 	return strconv.FormatFloat(f, 'f', -1, 64)
 }

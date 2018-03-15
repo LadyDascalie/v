@@ -4,83 +4,187 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"testing"
 
 	"github.com/ladydascalie/v/validators"
 )
 
-func init() {
+func TestMain(m *testing.M) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	validators.CustomFuncMap.Set("custom_function", func(args string, value, structure interface{}) error {
-		tester, ok := structure.(*Tester)
-		if !ok {
-			return fmt.Errorf("expected type: %T, but got type: %T", &Tester{}, structure)
-		}
-		log.Printf("%#+v\n", tester)
-
-		slice, ok := value.([]string)
-		if !ok {
-			errors.New("cannot handle non slice")
-		}
-		for _, item := range slice {
-			switch item {
-			case "a", "b", "c":
-				// all good
-			default:
-				return fmt.Errorf("item %s did not match any of the expected values", item)
-			}
-		}
-		return nil
+		return errors.New("custom_function was called")
 	})
-}
-
-func makeTestableStruct() Tester {
-	str := "hello world"
-	tester := Tester{
-		WrongTag:                  "a",
-		MaxCharIn:                 str,    // should fail
-		StringBetween:             str,    // should fail
-		StringPointerBetween:      &str,   // should fail if commented out
-		StringPointerBetween2:     &str,   // should not fail
-		StringIn:                  "onee", // should fail
-		StringBetweenNonZeroRange: "aaa",  // should fail because not enough char
-		IntBetween:                51,
-		IntIn:                     2,
-		RequiredField: &SubStruct{
-			F32Between:  12.12,   // should not fail
-			F32Between2: 100.0,   // should fail
-			f32Between3: 123.123, // should not trigger validation at all
-		},
-		RequiredSliceOfString: &[]string{"a", "b", "hello world"},
-		CallOutsideFunc:       &[]string{"a", "b", "c", "d"}, // d is not wanted
-	}
-	return tester
-}
-
-type Tester struct {
-	WrongTag                  string  `v:"gibberish"`
-	MaxCharIn                 string  `json:"max_char_in" v:"maxchar:10, in:hello|world"`
-	StringBetween             string  `v:"between:0..10"`
-	StringPointerBetween      *string `json:"string_pointer_between" v:"required,between:0..10"`
-	StringPointerBetween2     *string `json:"string_pointer_between_2" v:"required,between:0..10"`
-	StringIn                  string  `v:"in:one|two|three"`
-	StringBetweenNonZeroRange string  `v:"between:4..10"`
-
-	IntBetween int `v:"between:0..50"`
-	IntIn      int `v:"in:1|10|100"`
-
-	RequiredField *SubStruct `v:"required"`
-
-	RequiredSliceOfString *[]string `v:"required,maxchar:10,in:a|b|c"`
-	CallOutsideFunc       *[]string `v:"func:custom_function"`
-}
-
-type SubStruct struct {
-	F32Between  float32 `v:"between:0..99.9"`
-	F32Between2 float32 `v:"between:0..99.9"`
-	f32Between3 float32 `v:"between:0..99.9"`
+	os.Exit(m.Run())
 }
 
 func TestStruct(t *testing.T) {
-	tester := makeTestableStruct()
-	log.Println(Struct(&tester))
+	tests := []struct {
+		name      string
+		structure interface{}
+		wantErr   bool
+	}{
+		{
+			name:      "test nil",
+			structure: nil,
+			wantErr:   false,
+		},
+		{
+			name: "test unexported",
+			structure: struct {
+				field string
+			}{},
+			wantErr: false,
+		},
+		{
+			name:      "test non struct",
+			structure: []int{},
+			wantErr:   true,
+		},
+		{
+			name: "required without json name",
+			structure: struct {
+				Field *string `v:"required"`
+			}{},
+			wantErr: true,
+		},
+		{
+			name: "test required",
+			structure: struct {
+				NonNullableField string   `v:"required" json:"non_nullable_field"`
+				Ptr              *string  `v:"required" json:"ptr"`
+				Ptr2             *string  `v:"required"`
+				Channel          chan int `v:"required" json:"channel"`
+				Func             func()   `v:"required" json:"func"`
+				Slice            []int    `v:"required" json:"slice"`
+			}{
+				NonNullableField: "",
+				Ptr:              nil,
+				Channel:          nil,
+				Func:             nil,
+				Slice:            nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "test maxchar",
+			structure: struct {
+				TooLong   string `v:"maxchar:10"` // should error
+				Ok        string `v:"maxchar:11"` // should not error
+				WrongType int    `v:"maxchar:10"` // shoult not error
+			}{
+				TooLong: "Hello World",
+				Ok:      "Hello World",
+			},
+			wantErr: true,
+		},
+		{
+			name: "match email",
+			structure: struct {
+				Email string `v:"matches:email"`
+			}{
+				Email: "someone@gmail.com",
+			},
+			wantErr: false,
+		},
+		{
+			name: "test custom function",
+			structure: struct {
+				Field string `v:"func:custom_function"`
+			}{},
+			wantErr: true,
+		},
+		{
+			name: "missing custom function",
+			structure: struct {
+				Field string `v:"func:custom_function_oops" json:"field"`
+			}{},
+			wantErr: true,
+		},
+		{
+			name: "with sub struct",
+			structure: struct {
+				S struct {
+					Field string `v:"func:custom_function"`
+				}
+			}{},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := Struct(tt.structure); (err != nil) != tt.wantErr {
+				t.Errorf("Struct() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_validationErorrs_Error(t *testing.T) {
+	tests := []struct {
+		name    string
+		v       validationErorrs
+		wantErr bool
+	}{
+		{
+			name:    "slice has errors",
+			v:       []error{fmt.Errorf("some error")},
+			wantErr: true,
+		},
+		{
+			name:    "slice is empty",
+			v:       nil,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.v.Error(); (err != nil) != tt.wantErr {
+				t.Errorf("validationErorrs.Error() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_validate(t *testing.T) {
+	type args struct {
+		tag       string
+		value     interface{}
+		structure interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "invalid tag",
+			args: args{
+				tag:   "invalid",
+				value: "hello",
+				structure: struct {
+					Field string
+				}{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid tag",
+			args: args{
+				tag:   "invalid:invalid:invalid",
+				value: "hello",
+				structure: struct {
+					Field string
+				}{},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validate(tt.args.tag, tt.args.value, tt.args.structure); (err != nil) != tt.wantErr {
+				t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }

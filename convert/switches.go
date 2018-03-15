@@ -29,7 +29,7 @@ func ToFloat64(value interface{}) (f float64, err error) {
 func ToInt64(value interface{}) (f int64, err error) {
 	switch v := value.(type) {
 	case int64:
-		// in all those cases we convert to int64 first
+		return v, nil
 	case int, int8, int16, int32, float32, float64:
 		return reflect.ValueOf(v).Convert(reflect.TypeOf(f)).Interface().(int64), nil
 	case uint, uint8, uint16, uint32, uint64: // run the uint cases last as they are the rarest.

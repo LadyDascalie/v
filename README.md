@@ -1,61 +1,119 @@
-# What needs implementing currently:
+# `v` - It validates.
 
-## Without parameters
-- [ ] `email`
-- [ ] `url`
-- [ ] `dialstring`
-- [ ] `requrl`
-- [ ] `requri`
-- [ ] `alpha`
-- [ ] `utfletter`
-- [ ] `alphanum`
-- [ ] `utfletternum`
-- [ ] `numeric`
-- [ ] `utfnumeric`
-- [ ] `utfdigit`
-- [ ] `hexadecimal`
-- [ ] `hexcolor`
-- [ ] `rgbcolor`
-- [ ] `lowercase`
-- [ ] `uppercase`
-- [x] `int`
-- [x] `float`
-- [ ] `null`
-- [ ] `uuid`
-- [ ] `uuidv3`
-- [ ] `uuidv4`
-- [ ] `uuidv5`
-- [ ] `creditcard`
-- [ ] `isbn10`
-- [ ] `isbn13`
-- [ ] `json`
-- [ ] `multibyte`
-- [ ] `ascii`
-- [ ] `printableascii`
-- [ ] `fullwidth`
-- [ ] `halfwidth`
-- [ ] `variablewidth`
-- [ ] `base64`
-- [ ] `datauri`
-- [ ] `ip`
-- [ ] `port`
-- [ ] `ipv4`
-- [ ] `ipv6`
-- [ ] `dns`
-- [ ] `host`
-- [ ] `mac`
-- [ ] `latitude`
-- [ ] `longitude`
-- [ ] `ssn`
-- [ ] `semver`
-- [ ] `rfc3339`
-- [ ] `rfc3339WithoutZone`
-- [ ] `ISO3166Alpha2`
-- [ ] `ISO3166Alpha3`
+## Usage:
+```go
+package main
 
-## With parameters
-- [x] `range:min..max)`
-- [x] `length:min..max`
-- [x] `runelength:min..max`
-- [ ] `matches:pattern`
-- [x] `in:string1,string2,...`
+import (
+	"log"
+
+	"github.com/ladydascalie/v"
+)
+
+type Person struct {
+	FirstName   string `v:"maxchar:255"`
+	LastName    string `v:"maxchar:255"`
+	PhoneNumber string `v:"between:0..9"`
+	Age         int    `v:"between:21..*"`
+	// wilcard syntax means math.MaxFloat64 will be used here.
+	// if the wilcard was on the left side, this would have been
+	// -math.MaxFloat64
+}
+
+func main() {
+	p1 := Person{
+		FirstName:   "John",
+		LastName:    "Doe",
+		PhoneNumber: "123456789",
+		Age:         16,
+	}
+
+	if err := v.Struct(p1); err != nil {
+		log.Println(err)
+	}
+}
+
+// Output: Age: expected a value between 21 and 1.7976931348623157e+308, but got 16
+```
+
+
+## The `FuncMap`:
+
+These are the built-in validators provided by `v`
+
+```go
+var FuncMap = map[string]func(args string, value interface{}) error{
+	"required":      Required,
+	"maxchar":       Maxchar,
+	"in":            In,
+	"between":       Between,
+	"bytes_between": BytesBetween,
+	"empty_string":  EmptyString,
+	"is_int64":      IsInt64,
+	"is_float64":    IsFloat64,
+	"matches":       Matches,
+}
+```
+
+### Custom Validators
+
+You may add custom validators to `v`, an `init` method is a very good time to do this:
+
+```go
+func init() {
+	v.Set("custom_function", func(args string, value, structure interface{}) error {
+		// do some validation
+		return nil
+	})
+}
+```
+
+Then simply set the validation tag like so:
+
+```go
+type A struct {
+	Name string `v:"func:custom_function"`
+}
+```
+
+That's all it takes.
+
+### About RegExp
+
+The `RegExp` that `matches` provides are taken from [govalidator](https://github.com/asaskevich/govalidator). Here is the complete list of them:
+
+```
+- email
+- credit_card
+- isbn10
+- isbn13
+- uuid3
+- uuid4
+- uuid5
+- uuid
+- alpha
+- alphanum
+- numeric
+- int
+- float
+- hexadecimal
+- hex_color
+- rgb_color
+- ascii
+- printable_ascii
+- multi_byte
+- full_width
+- half_width
+- base64
+- data_uri
+- latitude
+- longitude
+- dns_name
+- url
+- ssn
+- win_path
+- unix_path
+- semver
+- has_lowercase
+- has_uppercase
+```

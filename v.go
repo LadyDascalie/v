@@ -3,7 +3,6 @@ package v
 import (
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 
@@ -17,6 +16,18 @@ const (
 	// common tags
 	required = "required"
 )
+
+// Set a new validator into the custom func map
+func Set(tag string, validator validators.Validator) {
+	c := validators.GetFuncMap()
+	c.Set(tag, validator)
+}
+
+// Get a validator from the custom func map
+func Get(tag string) (validator validators.Validator, ok bool) {
+	c := validators.GetFuncMap()
+	return c.Get(tag)
+}
 
 // Struct takes in an interface, which must be a struct
 // all validation is ran based on the provided tags.
@@ -43,8 +54,9 @@ func Struct(structure interface{}) error {
 		}
 
 		// recurse if this is an embedded struct
-		if value.Kind() == reflect.Struct {
-			Struct(value.Interface())
+		if value.Kind() == reflect.Struct && field.PkgPath == "" {
+			// only exported fields should do this
+			return Struct(value.Interface())
 		}
 
 		// get all the v tags
@@ -56,11 +68,17 @@ func Struct(structure interface{}) error {
 		// split the v tags on comma
 		vtags := strings.Split(tags, ",")
 
+		// validation errors collection
+		var vErrors validationErorrs
+
 		// range over the tags
 		for _, vtag := range vtags {
 			if err := handleValidationTag(vtag, jtag, field, value, structure); err != nil {
-				log.Println(err)
+				vErrors = append(vErrors, err)
 			}
+		}
+		if len(vErrors) != 0 {
+			return vErrors.Error()
 		}
 	}
 	return nil
@@ -106,27 +124,22 @@ func validate(tag string, value, structure interface{}) error {
 		return fmt.Errorf("v cannot parse struct tag <%v> please refer to the format rules", tag)
 	}
 
-	// run through the func map and see if there's a match
-	for name, method := range validators.FuncMap {
-		if vtag.Name == name {
-			return run(value, structure, vtag, method)
-		}
-	}
-	log.Printf("could not parse validation tag: %s", vtag.Name)
-	return nil
-}
-
-func run(value, structure interface{}, vtag *validationTag, method func(args string, value interface{}) error) error {
-	switch vtag.Name {
-	case "func":
+	// first check for custom functions
+	if vtag.Name == "func" {
 		fn, ok := validators.CustomFuncMap.Get(vtag.Args)
 		if ok {
 			return fn(vtag.Args, value, structure)
 		}
-		return fmt.Errorf("custom validator %s did not match", vtag.Args)
-	default:
-		return method(vtag.Args, value)
+		return fmt.Errorf("custom validator %s did not match any available function", vtag.Args)
 	}
+
+	// run through the func map and see if there's a match
+	for name, method := range validators.FuncMap {
+		if vtag.Name == name {
+			return method(vtag.Args, value)
+		}
+	}
+	return fmt.Errorf("could not parse validation tag: %s", vtag.Name)
 }
 
 type validationTag struct {
@@ -144,6 +157,8 @@ func newValidationTag(tag string) *validationTag {
 	case 2:
 		vtag.Name = parts[0]
 		vtag.Args = parts[1]
+	default:
+		return nil
 	}
 	return &vtag
 }
