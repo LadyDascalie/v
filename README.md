@@ -1,5 +1,7 @@
 # `v` - It validates.
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/ladydascalie/v)](https://goreportcard.com/report/github.com/ladydascalie/v)
+
 ## Usage:
 ```go
 package main
