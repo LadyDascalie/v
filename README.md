@@ -1,6 +1,8 @@
 # `v` - It validates.
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/ladydascalie/v)](https://goreportcard.com/report/github.com/ladydascalie/v)
+[![Build Status](https://api.travis-ci.org/ladydascalie/v.svg?branch=master)](https://api.travis-ci.org/ladydascalie/v.svg?branch=master)
+[![Code Coverage](https://codecov.io/gh/ladydascalie/v/branch/master/graph/badge.svg)](https://codecov.io/gh/ladydascalie/v/branch/master/graph/badge.svg)
 
 ## Usage:
 ```go
