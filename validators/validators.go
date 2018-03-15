@@ -3,13 +3,13 @@ package validators
 import (
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
 
-	"engo.io/engo/math"
 	"github.com/ladydascalie/v/convert"
 	"github.com/ladydascalie/v/sanity"
 )
