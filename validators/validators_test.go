@@ -1,6 +1,7 @@
 package validators
 
 import (
+	"fmt"
 	"math"
 	"sync"
 	"testing"
@@ -815,6 +816,20 @@ func Test_f64(t *testing.T) {
 				f: 64.0,
 			},
 			want: "64",
+		},
+		{
+			name: "max float",
+			args: args{
+				f: math.MaxFloat64,
+			},
+			want: fmt.Sprint(math.MaxFloat64),
+		},
+		{
+			name: "min float",
+			args: args{
+				f: -math.MaxFloat64,
+			},
+			want: fmt.Sprint(-math.MaxFloat64),
 		},
 	}
 	for _, tt := range tests {

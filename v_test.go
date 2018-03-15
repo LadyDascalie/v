@@ -18,6 +18,16 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestSetGet(t *testing.T) {
+	Set("test", func(args string, value, structure interface{}) error {
+		return nil
+	})
+	_, ok := Get("test")
+	if !ok {
+		t.Fail()
+	}
+}
+
 func TestStruct(t *testing.T) {
 	tests := []struct {
 		name      string
