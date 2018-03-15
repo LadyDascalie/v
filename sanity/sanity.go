@@ -2,12 +2,6 @@ package sanity
 
 import "reflect"
 
-const (
-	Numeric = iota
-	String
-	Unknown
-)
-
 // IsNullable checks if a given value is nullable
 func IsNullable(value interface{}) bool {
 	switch reflect.ValueOf(value).Kind() {
