@@ -326,8 +326,12 @@ func stringSliceToFloatSlice(values []string) (floats []float64, err error) {
 // f64 formats a float value for human reading.
 // ex: 100.0 -> 100 or 100.123000 -> 100.123
 func f64(f float64) string {
-	if f == math.MaxFloat64 || f == -math.MaxFloat64 {
-		return fmt.Sprint(f)
+	switch f {
+	case math.MaxFloat64:
+		return "max float64"
+	case -math.MaxFloat64:
+		return "min float64"
+	default:
+		return strconv.FormatFloat(f, 'f', -1, 64)
 	}
-	return strconv.FormatFloat(f, 'f', -1, 64)
 }
