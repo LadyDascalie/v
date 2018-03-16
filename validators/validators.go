@@ -288,7 +288,7 @@ func checkLength(args string, value interface{}) error {
 	}
 	count := float64(utf8.RuneCountInString(str))
 	if count < min || count > max {
-		return fmt.Errorf("expected a value between %s and %s, but got %s", f64(min), f64(max), f64(count))
+		return fmt.Errorf("expected string length to be between %s and %s, but got %s", f64(min), f64(max), f64(count))
 	}
 	return nil
 }
