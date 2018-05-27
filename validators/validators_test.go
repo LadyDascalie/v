@@ -641,6 +641,15 @@ func Test_bounds(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "valid negative range",
+			args: args{
+				s: "-10..-1",
+			},
+			wantMin: -10.0,
+			wantMax: -1.0,
+			wantErr: false,
+		},
+		{
 			name: "right range broken",
 			args: args{
 				s: "0..",
