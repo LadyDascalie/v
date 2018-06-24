@@ -56,7 +56,9 @@ func Struct(structure interface{}) error {
 		// recurse if this is an embedded struct
 		if value.Kind() == reflect.Struct && field.PkgPath == "" {
 			// only exported fields should do this
-			return Struct(value.Interface())
+			if err := Struct(value.Interface()); err != nil {
+				return err
+			}
 		}
 
 		// get all the v tags
