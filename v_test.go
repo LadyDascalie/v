@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-		"github.com/ladydascalie/v/validators"
+	"github.com/ladydascalie/v/validators"
 )
 
 func TestMain(m *testing.M) {
