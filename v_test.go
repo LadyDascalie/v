@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ladydascalie/v/validators"
+		"github.com/ladydascalie/v/validators"
 )
 
 func TestMain(m *testing.M) {
@@ -127,6 +127,25 @@ func TestStruct(t *testing.T) {
 				t.Errorf("Struct() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func Test_Embedding(t *testing.T) {
+	type A struct {
+		StrField string `v:"between:0..10"`
+	}
+	type B struct {
+		A
+		IntField int `v:"between:0..10"`
+	}
+	err := Struct(B{
+		A: A{
+			StrField: "hello world!", // this is not ok
+		},
+		IntField: 10, // this is ok
+	})
+	if err == nil {
+		t.Error("This should fail")
 	}
 }
 
